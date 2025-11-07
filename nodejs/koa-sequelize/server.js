@@ -1,27 +1,48 @@
-const express = require('express');
-const bodyParser = require('body-parser');
+const Koa = require('koa');
+const bodyParser = require('koa-bodyparser');
+const cors = require('@koa/cors');
 require('dotenv').config();
 
 const sequelize = require('./config/database');
 const userRoutes = require('./routes/users');
 
-const app = express();
+const app = new Koa();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cors());
+app.use(bodyParser());
+
+// Error handling middleware
+app.use(async (ctx, next) => {
+  try {
+    await next();
+  } catch (err) {
+    ctx.status = err.status || 500;
+    ctx.body = {
+      success: false,
+      error: err.message
+    };
+    console.error('Error:', err);
+  }
+});
 
 // Routes
-app.use('/api/users', userRoutes);
+app.use(userRoutes.routes());
+app.use(userRoutes.allowedMethods());
 
 // Health check
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Node.js + Sequelize CRUD API',
+const Router = require('koa-router');
+const healthRouter = new Router();
+
+healthRouter.get('/', async (ctx) => {
+  ctx.body = {
+    message: 'Koa + Sequelize CRUD API',
     status: 'running'
-  });
+  };
 });
+
+app.use(healthRouter.routes());
 
 // Database connection and server start
 const startServer = async () => {
